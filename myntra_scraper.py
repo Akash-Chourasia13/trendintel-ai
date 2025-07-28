@@ -84,7 +84,7 @@ async def main():
         # Add more categories here
         "https://www.myntra.com/bra"
     ]
-    total_pages_to_scrape = 2
+    total_pages_to_scrape = 1
     all_results = []
 
     # 🎬 Start Playwright session
@@ -134,11 +134,56 @@ async def main():
 
                 except Exception as e:
                     print(f"❌ Error scraping {paginated_url}: {e}")
+            # Now get all the required details by visiting each link
+            all_results = all_results[:11]
+            for link in all_results:
+                try:
+                    # Rotate proxy for every request
+                    proxy = random.choice(proxies)
+                    # 🧱 Create a new context for each page (mimics new user session)
+                    context = await browser.new_context(
+                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        locale="en-US",
+                        timezone_id="Asia/Kolkata",
+                        viewport={"width": 1280, "height": 800},
+                        proxy={
+                            "server": f"http://{proxy['server']}",
+                            "username": proxy["username"],
+                            "password": proxy["password"]
+                        }
+                    )
+
+                    new_page = await context.new_page()
+                    await new_page.goto(link['Product_Link'])
+
+                    # Add headers to look less like a bot
+                    await new_page.set_extra_http_headers({
+                        "Accept-Language": "en-US,en;q=0.9",
+                        "Referer": "https://www.google.com/"
+                    })
+                    await asyncio.sleep(random.uniform(3, 6)) 
+                    # Extract product title as an example
+                    try:
+                        await new_page.wait_for_selector("h1.pdp-title", timeout=5000)
+                        title = await new_page.text_content("h1.pdp-title")
+                        link['Title'] =  title
+                        print(f"Product Title: {title}")
+                        # Clean up
+                        await new_page.close()
+                        await context.close()
+                        await asyncio.sleep(random.uniform(1, 2))
+
+                    except Exception as e:
+                        print(f"Error on {link}: {e}")
+
+
+                except Exception as e:
+                    print(f"❌ Error scraping {link}: {e}")         
 
         await browser.close()
 
     # 💾 Save the collected product links to Excel
-    df = pd.DataFrame(all_results, columns=["Product_Link"])
+    df = pd.DataFrame(all_results, columns=["Product_Link","Title"])
     df.to_excel("myntra_bra_links.xlsx", index=False)
     print("✅ Saved to myntra_bra_links.xlsx")
 
