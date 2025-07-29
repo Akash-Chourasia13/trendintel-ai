@@ -5,7 +5,10 @@ import re, os, random, json
 # 📦 Third-party libraries
 from playwright.async_api import async_playwright  # Async Playwright for browser automation
 from playwright_stealth import stealth_async       # Helps bypass bot detection
-import pandas as pd                                # For saving scraped data to Excel
+import pandas as pd     
+
+from asyncio import Semaphore                           # For saving scraped data to Excel
+from more_itertools import chunked  # pip install more-itertools
 
 # 🌐 Proxy list - rotating proxies to reduce chance of IP bans
 proxies = [
@@ -78,6 +81,54 @@ async def scrape_category(page, category_url):
     print(f"🧭 Found {len(product_links)} links on this page.")
     return product_links
 
+# 👇 Accept playwright, not browser
+async def scrape_product_details(context, link, proxy, semaphore):
+    async with semaphore:
+        await asyncio.sleep(random.uniform(1, 3))
+
+        # browser = await playwright.chromium.launch(headless=False)
+
+        # context = await browser.new_context(
+        #     user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        #     locale="en-US",
+        #     timezone_id="Asia/Kolkata",
+        #     viewport={"width": 1280, "height": 800},
+        #     proxy={
+        #         "server": f"http://{proxy['server']}",
+        #         "username": proxy["username"],
+        #         "password": proxy["password"]
+        #     }
+        # )
+        page = await context.new_page()
+        try:
+            await page.goto(link['Product_Link'])
+            await asyncio.sleep(random.uniform(2, 4))
+            await page.wait_for_selector("h1.pdp-title", timeout=5000)
+            title = await page.text_content("h1.pdp-title")
+            description = await page.text_content("h1.pdp-name")
+
+            try:
+                rating = await page.text_content("div.index-overallRating > div:nth-child(1)")
+            except:
+                rating = ""
+
+            try:
+                numberOfRatings = await page.text_content("div.index-ratingsCount")
+            except:
+                numberOfRatings = ""
+
+            link['Title'] = title
+            link['Description'] = description
+            link['Ratings'] = rating
+            link['Number Of Ratings'] = numberOfRatings
+
+        except Exception as e:
+            print(f"Error scraping {link['Product_Link']}: {e}")
+        # finally:
+        #     await context.close()
+        #     # await browser.close()
+
+
 # 🚀 Main function to manage the scraping process
 async def main():
     category_urls = [
@@ -129,19 +180,19 @@ async def main():
 
                     # Clean up
                     await page.close()
-                    await context.close()
+                    # await context.close()
                     await asyncio.sleep(random.uniform(1, 2))
 
                 except Exception as e:
                     print(f"❌ Error scraping {paginated_url}: {e}")
             # Now get all the required details by visiting each link
-            all_results = all_results[:11]
-            for link in all_results:
-                try:
-                    # Rotate proxy for every request
-                    proxy = random.choice(proxies)
-                    # 🧱 Create a new context for each page (mimics new user session)
-                    context = await browser.new_context(
+            all_results = all_results[:4]
+            # Run up to 5 scrapers at a time in parallel
+            # Limit parallelism (e.g., max 5 concurrent scrapers)
+            semaphore = asyncio.Semaphore(2)
+            batch_size = 2
+            for batch in chunked(all_results, batch_size):
+                context = await browser.new_context(
                         user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                         locale="en-US",
                         timezone_id="Asia/Kolkata",
@@ -152,45 +203,15 @@ async def main():
                             "password": proxy["password"]
                         }
                     )
-
-                    new_page = await context.new_page()
-                    await new_page.goto(link['Product_Link'])
-
-                    # Add headers to look less like a bot
-                    await new_page.set_extra_http_headers({
-                        "Accept-Language": "en-US,en;q=0.9",
-                        "Referer": "https://www.google.com/"
-                    })
-                    await asyncio.sleep(random.uniform(3, 6)) 
-                    # Extract product title as an example
-                    try:
-                        await new_page.wait_for_selector("h1.pdp-title", timeout=5000)
-                        title = await new_page.text_content("h1.pdp-title")
-                        description = await new_page.text_content("h1.pdp-name")
-                        # Handle ratings safely
-                        try:
-                            rating = await new_page.text_content("div.index-overallRating > div:nth-child(1)")
-                        except:
-                            rating = ""  # or "N/A"
-
-                        try:
-                            numberOfRatings = await new_page.text_content("div.index-ratingsCount")
-                        except:
-                            numberOfRatings = ""  # or "N/A"
-                        link['Title'],link['Description'],link['Ratings'],link['Number Of Ratings'] =  title,description,rating,numberOfRatings
-                        # print(f"Product Title: {title}")
-                        # Clean up
-                        await new_page.close()
-                        await context.close()
-                        await asyncio.sleep(random.uniform(1, 2))
-
-                    except Exception as e:
-                        print(f"Error on {link}: {e}")
-
-
-                except Exception as e:
-                    print(f"❌ Error scraping {link}: {e}")         
-
+                tasks = [
+                    scrape_product_details(context, link, random.choice(proxies), semaphore)
+                    for link in batch
+                ]
+                await asyncio.gather(*tasks)
+                print(f"✅ Completed one batch of {len(batch)} tasks.")
+                await context.close()
+                await asyncio.sleep(random.uniform(10, 20))  # delay before next batch
+        await context.close()
         await browser.close()
 
     # 💾 Save the collected product links to Excel
