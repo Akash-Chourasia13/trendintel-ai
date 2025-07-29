@@ -166,8 +166,19 @@ async def main():
                     try:
                         await new_page.wait_for_selector("h1.pdp-title", timeout=5000)
                         title = await new_page.text_content("h1.pdp-title")
-                        link['Title'] =  title
-                        print(f"Product Title: {title}")
+                        description = await new_page.text_content("h1.pdp-name")
+                        # Handle ratings safely
+                        try:
+                            rating = await new_page.text_content("div.index-overallRating > div:nth-child(1)")
+                        except:
+                            rating = ""  # or "N/A"
+
+                        try:
+                            numberOfRatings = await new_page.text_content("div.index-ratingsCount")
+                        except:
+                            numberOfRatings = ""  # or "N/A"
+                        link['Title'],link['Description'],link['Ratings'],link['Number Of Ratings'] =  title,description,rating,numberOfRatings
+                        # print(f"Product Title: {title}")
                         # Clean up
                         await new_page.close()
                         await context.close()
@@ -183,7 +194,7 @@ async def main():
         await browser.close()
 
     # 💾 Save the collected product links to Excel
-    df = pd.DataFrame(all_results, columns=["Product_Link","Title"])
+    df = pd.DataFrame(all_results, columns=["Product_Link","Title","Description","Ratings","Number Of Ratings"])
     df.to_excel("myntra_bra_links.xlsx", index=False)
     print("✅ Saved to myntra_bra_links.xlsx")
 
