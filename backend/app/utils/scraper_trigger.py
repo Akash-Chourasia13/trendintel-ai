@@ -45,9 +45,10 @@
 from app.utils.myntra_scraper import run_myntra_scraper
 # In future you can import more like: from utils.amazon_scraper import run_amazon_scraper
 
-def trigger_scraper(site_name: str):
+async def trigger_scraper(site_name: str):
     if site_name.lower() == "myntra":
-        return run_myntra_scraper()
+        result = await run_myntra_scraper()
+        return result
     # elif site_name.lower() == "amazon":
     #     return run_amazon_scraper()
     else:

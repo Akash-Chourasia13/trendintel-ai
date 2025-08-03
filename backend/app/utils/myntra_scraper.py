@@ -47,20 +47,20 @@ async def safe_goto(page, url, retries=3):
             await page.goto(url, timeout=60000, wait_until="domcontentloaded")
             return True
         except Exception as e:
-            print(f"⚠️ Retry {i+1}/{retries} for {url} due to error: {e}")
+            print(f" Retry {i+1}/{retries} for {url} due to error: {e}")
             await asyncio.sleep(2 ** i)  # Wait 1, 2, 4... seconds
     return False
 
 # 🧲 Core scraping function to collect product links from a category page
 async def scrape_category(page, category_url):
     success = await safe_goto(page, category_url)
+
     if not success:
         print(f" Failed to load {category_url}")
         return []
 
     # Random wait to mimic human behavior
     await asyncio.sleep(random.uniform(5, 10))
-
     # Wait for product container to load
     await page.wait_for_selector('ul.results-base > li', timeout=10000)
 
@@ -70,7 +70,6 @@ async def scrape_category(page, category_url):
         await page.wait_for_timeout(random.randint(500, 1000))
 
     await asyncio.sleep(random.uniform(3, 6))
-
     # Extract all product links
     li_elements = await page.query_selector_all("ul.results-base > li.product-base")
     product_links = []
@@ -80,7 +79,7 @@ async def scrape_category(page, category_url):
         if href:
             product_links.append({'Product_Link': f"https://www.myntra.com/{href}"})
 
-    print(f"🧭 Found {len(product_links)} links on this page.")
+    print(f"Found {len(product_links)} links on this page.")
     return product_links
 
 # 👇 Accept playwright, not browser
@@ -101,13 +100,19 @@ async def scrape_product_details(context, link, proxy, semaphore):
         #         "password": proxy["password"]
         #     }
         # )
+
         page = await context.new_page()
         try:
-            await page.goto(link['Product_Link'])
+            # await page.goto(link['Product_Link'])
+            await page.goto(link['Product_Link'], wait_until="domcontentloaded", timeout=60000)
             await asyncio.sleep(random.uniform(2, 4))
-            await page.wait_for_selector("h1.pdp-title", timeout=5000)
-            title = await page.text_content("h1.pdp-title")
-            description = await page.text_content("h1.pdp-name")
+            try:
+                await page.wait_for_selector("h1.pdp-title", timeout=15000)  # was 5000ms
+                title = await page.text_content("h1.pdp-title")
+                description = await page.text_content("h1.pdp-name")
+            except Exception as e:
+                print(f" Failed to get product details for {link['Product_Link']}: {e}")
+
 
             try:
                 rating = await page.text_content("div.index-overallRating > div:nth-child(1)")
@@ -143,12 +148,18 @@ async def run_myntra_scraper():
 
     # 🎬 Start Playwright session
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)  # Set to True for background scraping
+        browser = await p.firefox.launch(headless=True,args=[
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-gpu",
+                        "--single-process",
+                    ])  # Set to True for background scraping
 
         for category_url in category_urls:
             for page_num in range(1, total_pages_to_scrape + 1):
                 paginated_url = f"{category_url}?p={page_num}"
-                print(f"📄 Scraping: {paginated_url}")
+                print(f"Scraping: {paginated_url}")
 
                 try:
                     # Rotate proxy for every request
@@ -166,14 +177,19 @@ async def run_myntra_scraper():
                             "password": proxy["password"]
                         }
                     )
-
                     page = await context.new_page()
-
                     # Add headers to look less like a bot
                     await page.set_extra_http_headers({
                         "Accept-Language": "en-US,en;q=0.9",
                         "Referer": "https://www.google.com/"
                     })
+                    # await page.set_extra_http_headers({
+                    #     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9",
+                    #     "Upgrade-Insecure-Requests": "1",
+                    #     "Connection": "close",  # force HTTP/1.1
+                    #     "Accept-Language": "en-US,en;q=0.9",
+                    #     "Referer": "https://www.google.com/"
+                    # })
 
                     await asyncio.sleep(random.uniform(3, 6))
 
@@ -187,7 +203,7 @@ async def run_myntra_scraper():
                     await asyncio.sleep(random.uniform(1, 2))
 
                 except Exception as e:
-                    print(f"❌ Error scraping {paginated_url}: {e}")
+                    print(f"Error scraping {paginated_url}: {e}")
             # Now get all the required details by visiting each link
             # all_results = all_results[:4]
             # Run up to 5 scrapers at a time in parallel
