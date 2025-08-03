@@ -1,0 +1,21 @@
+ Scraper started running!
+1111111111111111111
+Traceback (most recent call last):
+  File "D:\TrendIntel AI\backend\app\utils\myntra_scraper.py", line 271, in <module>
+    asyncio.run(main())  # \U0001f501 Run the async main function inside event loop
+    ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\akash.chourasia\AppData\Local\Programs\Python\Python311\Lib\asyncio\runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\akash.chourasia\AppData\Local\Programs\Python\Python311\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\akash.chourasia\AppData\Local\Programs\Python\Python311\Lib\asyncio\base_events.py", line 653, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "D:\TrendIntel AI\backend\app\utils\myntra_scraper.py", line 151, in main
+    print(f"\U0001f4c4 Scraping: {paginated_url}")
+  File "C:\Users\akash.chourasia\AppData\Local\Programs\Python\Python311\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f4c4' in position 0: character maps to <undefined>
