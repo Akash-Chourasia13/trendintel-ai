@@ -39,3 +39,8 @@ websocket-client==1.8.0
 wsproto==1.2.0
 celery 
 redis
+torch
+transformers==4.45.2
+flax 
+jax 
+jaxlib
