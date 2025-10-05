@@ -19,9 +19,9 @@ from more_itertools import chunked  # pip install more-itertools
 
 # 🌐 Proxy list - rotating proxies to reduce chance of IP bans
 proxies = [
-    {"server": "isp.decodo.com:10001", "username": "spavxwrl7o", "password": "d5_aqvaCG3eacVi1P8"},
-    {"server": "isp.decodo.com:10002", "username": "spavxwrl7o", "password": "d5_aqvaCG3eacVi1P8"},
-    {"server": "isp.decodo.com:10003", "username": "spavxwrl7o", "password": "d5_aqvaCG3eacVi1P8"}
+    # {"server": "isp.decodo.com:10001", "username": "spavxwrl7o", "password": "d5_aqvaCG3eacVi1P8"},
+    # {"server": "isp.decodo.com:10002", "username": "spavxwrl7o", "password": "d5_aqvaCG3eacVi1P8"},
+    # {"server": "isp.decodo.com:10003", "username": "spavxwrl7o", "password": "d5_aqvaCG3eacVi1P8"}
 ]
 
 # 🧠 Create a browser context with randomized settings to mimic real users
@@ -43,7 +43,7 @@ async def create_dynamic_context(browser):
     #     timezone_id=random.choice(timezones),
     #     viewport=random.choice(viewports)
     # )
-    proxy = random.choice(proxies)
+    # proxy = random.choice(proxies)
 
     # 🧱 Create a new context for each page (mimics new user session)
     context = await browser.new_context(
@@ -51,11 +51,12 @@ async def create_dynamic_context(browser):
         locale="en-US",
         timezone_id="Asia/Kolkata",
         viewport={"width": 1280, "height": 800},
-        proxy={
-            "server": f"http://{proxy['server']}",
-            "username": proxy["username"],
-            "password": proxy["password"]
-        }
+        # proxy = {}
+        # proxy={
+        #     "server": f"http://{proxy['server']}",
+        #     "username": proxy["username"],
+        #     "password": proxy["password"]
+        # }
     )
 
 
@@ -141,11 +142,39 @@ async def extract_reviews_details(review_link: str) -> dict:
 
         reviews = []
 
-        review_elements = await page.query_selector_all("div.user-review-userReviewWrapper")
+        # review_elements = await page.query_selector_all("div.user-review-userReviewWrapper")
         # 🔃 Scroll down to trigger lazy loading
-        for _ in range(10):
-            await page.mouse.wheel(0, random.randint(100, 300))
-            await page.wait_for_timeout(random.randint(500, 1000))
+        # for _ in range(20):
+        #     await page.mouse.wheel(0, random.randint(100, 300))
+        #     await page.wait_for_timeout(random.randint(500, 1000))
+        wait_time=1500
+        same_count_tries = 0
+        last_count = 0
+
+        for i in range(20):
+            # Scroll down
+            await page.mouse.wheel(0, random.randint(500, 800))
+
+            # Wait a bit to allow new reviews to load
+            await asyncio.sleep(wait_time / 100)
+
+            # Check current reviews
+            review_elements = await page.query_selector_all("div.user-review-userReviewWrapper")
+            current_count = len(review_elements)
+
+            print(f"Scroll {i+1}: Found {current_count} reviews")
+
+            if current_count == last_count:
+                same_count_tries += 1
+                if same_count_tries >= 3:  # no change for 3 iterations → stop
+                    print("✅ No new reviews after multiple scrolls, stopping")
+                    break
+            else:
+                same_count_tries = 0  # reset if new reviews appeared
+
+            last_count = current_count
+        review_elements = await page.query_selector_all("div.user-review-userReviewWrapper")
+
         for review in review_elements:
             # Extract rating
             rating_el = await review.query_selector("span.user-review-starRating")
@@ -292,7 +321,8 @@ async def extract_price_details(page) -> dict:
 
 
 # 👇 Accept playwright, not browser
-async def scrape_product_details(context, link, proxy, semaphore):
+# async def scrape_product_details(context, link, proxy, semaphore):
+async def scrape_product_details(context, link, semaphore):
     async with semaphore:
         await asyncio.sleep(random.uniform(1, 3))
         try:
@@ -447,8 +477,12 @@ async def run_myntra_scraper():
                 except Exception as e:
                     print("eeeee",e)    
                 
+                # tasks = [
+                #     scrape_product_details(context, link, random.choice(proxies), semaphore)
+                #     for link in batch
+                # ]
                 tasks = [
-                    scrape_product_details(context, link, random.choice(proxies), semaphore)
+                    scrape_product_details(context, link, semaphore)
                     for link in batch
                 ]
                 await asyncio.gather(*tasks)
@@ -482,7 +516,8 @@ async def run_myntra_scraper():
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
             # Create folder path
-            folder_path = os.path.join("scraped_data", category)
+            # folder_path = os.path.join("scraped_data", category)
+            folder_path = os.path.abspath(os.path.join("scraped_data", category))
             os.makedirs(folder_path, exist_ok=True)
 
             # Define file name
@@ -491,6 +526,12 @@ async def run_myntra_scraper():
 
             # Save the DataFrame
             df.to_excel(file_path, index=False)
+            print(df.head())
+            print(len(df))
+            print(f"✅ DataFrame saved successfully!")
+            print(f"Absolute path: {file_path}")
+            print(f"Number of rows saved: {len(df)}")
+
             print(f"Saved to: {file_path}")
         await context.close()
         await browser.close()    
@@ -523,7 +564,5 @@ if __name__ == "__main__":
 #         # Open the file again to log the error
 #         with open("myntra_log.txt", "a", encoding="utf-8") as f:
 #             f.write(f"❌ Error: {str(e)}\n")
-# hr@freestoneinfotech.com
-# madhvi EY HR - connect next monday
 
     asyncio.run(run_myntra_scraper())  # 🔁 Run the async main function inside event loop
