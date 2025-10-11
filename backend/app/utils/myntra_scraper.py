@@ -15,7 +15,7 @@ import pandas as pd
 from asyncio import Semaphore                           # For saving scraped data to Excel
 from more_itertools import chunked  # pip install more-itertools
 
-
+from review_analyzer import ReviewAnalyzer
 
 # 🌐 Proxy list - rotating proxies to reduce chance of IP bans
 proxies = [
@@ -141,6 +141,7 @@ async def extract_reviews_details(review_link: str) -> dict:
         await asyncio.sleep(random.uniform(2, 4))
 
         reviews = []
+        review_analyzer = ReviewAnalyzer()
 
         # review_elements = await page.query_selector_all("div.user-review-userReviewWrapper")
         # 🔃 Scroll down to trigger lazy loading
@@ -196,12 +197,10 @@ async def extract_reviews_details(review_link: str) -> dict:
                 "reviewer": name,
                 "date": date
             })
-            # Load sentiment model (lightweight version for speed)
-            sentiment_analyzer = pipeline("sentiment-analysis")
+            if review_text:
+                analysis = review_analyzer.analyze(review_text)
+                reviews[-1].update(analysis)
 
-            # def analyze_sentiment(review_text):
-            sentiment = sentiment_analyzer(review_text[:512])[0]['label'].lower()  # truncate to 512 tokens
-            reviews[-1]['sentiment'] = sentiment
         print(f"Extracted {len(reviews)} reviews.")
         print(f"Reviews details for {review_link}: {reviews}")
 

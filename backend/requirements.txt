@@ -44,3 +44,14 @@ transformers==4.45.2
 flax 
 jax 
 jaxlib
+transformers 
+keybert 
+sentence-transformers 
+torch 
+datasets 
+scikit-learn 
+spacy
+thefuzz[speedup]
+sentencepiece 
+protobuf
+
