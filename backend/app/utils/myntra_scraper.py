@@ -63,10 +63,10 @@ async def create_dynamic_context(browser):
     return context
 
 # ✅ A safe wrapper around page.goto with retries and backoff
-async def safe_goto(page, url, retries=3):
+async def safe_goto(page, url, retries=2):
     for i in range(retries):
         try:
-            await page.goto(url, timeout=60000, wait_until="domcontentloaded")
+            await page.goto(url, timeout=6000, wait_until="domcontentloaded")
             return True
         except Exception as e:
             print(f" Retry {i+1}/{retries} for {url} due to error: {e}")
@@ -82,16 +82,16 @@ async def scrape_category(page, category_url):
         return []
 
     # Random wait to mimic human behavior
-    await asyncio.sleep(random.uniform(5, 10))
+    await asyncio.sleep(random.uniform(2, 5))
     # Wait for product container to load
-    await page.wait_for_selector('ul.results-base > li', timeout=10000)
+    await page.wait_for_selector('ul.results-base > li', timeout=1000)
 
     # 🔃 Scroll down to trigger lazy loading
-    for _ in range(10):
+    for _ in range(5):
         await page.mouse.wheel(0, random.randint(100, 300))
-        await page.wait_for_timeout(random.randint(500, 1000))
+        await page.wait_for_timeout(random.randint(50, 100))
 
-    await asyncio.sleep(random.uniform(3, 6))
+    await asyncio.sleep(random.uniform(1, 3))
     # Extract all product links
     li_elements = await page.query_selector_all("ul.results-base > li.product-base")
     product_links = []
@@ -119,7 +119,7 @@ async def extract_reviews_details(review_link: str) -> dict:
     result = {}
     if not review_link:
         return result
-    await asyncio.sleep(random.uniform(2, 4))
+    await asyncio.sleep(random.uniform(1, 2))
         
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)    
@@ -134,11 +134,11 @@ async def extract_reviews_details(review_link: str) -> dict:
         if page:
             print(f"🔎 Scraping review details for {review_link}...")
             await safe_goto(page, review_link)
-            await asyncio.sleep(random.uniform(2, 4))
+            await asyncio.sleep(random.uniform(1, 2))
 
         # wait for reviews container to load
-        await page.wait_for_selector("div.detailed-reviews-userReviewsContainer",timeout = 20000)
-        await asyncio.sleep(random.uniform(2, 4))
+        await page.wait_for_selector("div.detailed-reviews-userReviewsContainer",timeout = 200)
+        await asyncio.sleep(random.uniform(1, 2))
 
         reviews = []
         review_analyzer = ReviewAnalyzer()
@@ -152,12 +152,12 @@ async def extract_reviews_details(review_link: str) -> dict:
         same_count_tries = 0
         last_count = 0
 
-        for i in range(20):
+        for i in range(5):
             # Scroll down
             await page.mouse.wheel(0, random.randint(500, 800))
 
             # Wait a bit to allow new reviews to load
-            await asyncio.sleep(wait_time / 100)
+            await asyncio.sleep(wait_time / 50)
 
             # Check current reviews
             review_elements = await page.query_selector_all("div.user-review-userReviewWrapper")
@@ -167,7 +167,7 @@ async def extract_reviews_details(review_link: str) -> dict:
 
             if current_count == last_count:
                 same_count_tries += 1
-                if same_count_tries >= 3:  # no change for 3 iterations → stop
+                if same_count_tries >= 2:  # no change for 3 iterations → stop
                     print("✅ No new reviews after multiple scrolls, stopping")
                     break
             else:
@@ -211,8 +211,115 @@ async def extract_reviews_details(review_link: str) -> dict:
 
     
 
+# async def extract_price_details(page) -> dict:
+#     """Async helper to extract price details from the product page."""
+#     result = {
+#         "display_price": None,
+#         "display_price_value": None,
+#         "mrp": None,
+#         "mrp_value": None,
+#         "discount_text": None,
+#         "discount_value": None,
+#         "selling_price_text": None,
+#         "selling_price_value": None,
+#     }
+
+#     # Prominent display price
+#     await page.wait_for_selector("p.pdp-discount-container", timeout=20000)  # wait for title
+
+#     display_price = await page.text_content("span.pdp-price") or ""
+#     display_price = display_price.strip()
+#     if display_price:
+#         result["display_price"] = display_price
+#         result["display_price_value"] = _clean_number(display_price)
+
+#     # MRP - try a couple of selectors
+#     mrp_text = await page.text_content("span.pdp-mrp-verbiage-amt") or ""
+
+#     # if not mrp_text:
+#     #     mrp_text = await page.text_content("span.pdp-mrp s") or ""
+#     mrp_text = mrp_text.strip()
+#     if mrp_text:
+#         result["mrp"] = mrp_text
+#         result["mrp_value"] = _clean_number(mrp_text)
+
+#     # Discount
+#     discount = await page.text_content("span.pdp-discount") or ""
+#     discount = discount.strip()
+#     if discount:
+#         result["discount_text"] = discount
+#         result["discount_value"] = _clean_number(discount)
+
+#     # Selling Price from verbiage block as fallback
+#     try:
+#         verbiage = await page.text_content("div.pdp-mrp-verbiage") or ""
+#         if verbiage:
+#             for line in verbiage.splitlines():
+#                 if "selling price" in line.lower():
+#                     selling_price_text = line.strip()
+#                     result["selling_price_text"] = selling_price_text
+#                     result["selling_price_value"] = _clean_number(selling_price_text)
+#                     break
+#     except Exception:
+#         pass
+
+#     # final fallback: selling_price = display_price
+#     if result["selling_price_value"] is None and result["display_price_value"] is not None:
+#         result["selling_price_value"] = result["display_price_value"]
+#         if not result["selling_price_text"]:
+#             result["selling_price_text"] = result["display_price"]
+
+#     # Features from the first product description ul li
+#     features = []
+#     li_texts = await page.locator("div.pdp-productDescriptorsContainer ul li").all_text_contents()
+#     for li in li_texts:
+#         text = li.strip()
+#         if not text:
+#             continue
+#         # split on first ":" to attempt key:value
+#         if ":" in text:
+#             k, v = text.split(":", 1)
+#             features.append({"key": k.strip(), "value": v.strip()})
+#         else:
+#             # fallback to generic feature key
+#             features.append({"key": "feature", "value": text})
+#     if features:
+#         result["features"] = features
+
+#     # Size & Fit
+#     size_and_fit = (await page.text_content("div.pdp-sizeFitDesc h4:has-text('Size & Fit') + p")) or ""
+#     size_and_fit = size_and_fit.strip()
+#     if size_and_fit:
+#         result["size_and_fit"] = size_and_fit
+
+#     # Material & Care
+#     material_and_care = (await page.text_content("div.pdp-sizeFitDesc h4:has-text('Material & Care') + p")) or ""
+#     material_and_care = material_and_care.strip()
+#     # Replace <br> produced newlines maybe — ensure normalized
+#     material_and_care = " ".join(material_and_care.split())
+#     if material_and_care:
+#         result["material_and_care"] = material_and_care
+
+#     # Specifications: pairs of .index-rowKey and .index-rowValue
+#     specs = []
+#     rows = await page.locator("div.index-tableContainer > div.index-row").all()
+#     # if direct children pattern doesn't match, try any .index-row under .index-tableContainer
+#     if not rows:
+#         rows = await page.locator(".index-tableContainer .index-row").all()
+#     for r in rows:
+#         key = (await r.locator(".index-rowKey").text_content()) or ""
+#         val = (await r.locator(".index-rowValue").text_content()) or ""
+#         key = key.strip()
+#         val = val.strip()
+#         if key or val:
+#             specs.append({"key": key, "value": val})
+#     if specs:
+#         result["specifications"] = specs        
+
+#     return result
+
 async def extract_price_details(page) -> dict:
-    """Async helper to extract price details from the product page."""
+    """Async helper to extract price details from the product page (with error handling)."""
     result = {
         "display_price": None,
         "display_price_value": None,
@@ -224,33 +331,43 @@ async def extract_price_details(page) -> dict:
         "selling_price_value": None,
     }
 
-    # Prominent display price
-    await page.wait_for_selector("p.pdp-discount-container", timeout=20000)  # wait for title
+    # --- Wait for main product area ---
+    try:
+        await page.wait_for_selector("p.pdp-discount-container", timeout=200)
+    except Exception:
+        pass
 
-    display_price = await page.text_content("span.pdp-price") or ""
-    display_price = display_price.strip()
-    if display_price:
-        result["display_price"] = display_price
-        result["display_price_value"] = _clean_number(display_price)
+    # --- Display Price ---
+    try:
+        display_price = await page.text_content("span.pdp-price") or ""
+        display_price = display_price.strip()
+        if display_price:
+            result["display_price"] = display_price
+            result["display_price_value"] = _clean_number(display_price)
+    except Exception:
+        pass
 
-    # MRP - try a couple of selectors
-    mrp_text = await page.text_content("span.pdp-mrp-verbiage-amt") or ""
+    # --- MRP ---
+    try:
+        mrp_text = await page.text_content("span.pdp-mrp-verbiage-amt") or ""
+        mrp_text = mrp_text.strip()
+        if mrp_text:
+            result["mrp"] = mrp_text
+            result["mrp_value"] = _clean_number(mrp_text)
+    except Exception:
+        pass
 
-    # if not mrp_text:
-    #     mrp_text = await page.text_content("span.pdp-mrp s") or ""
-    mrp_text = mrp_text.strip()
-    if mrp_text:
-        result["mrp"] = mrp_text
-        result["mrp_value"] = _clean_number(mrp_text)
+    # --- Discount ---
+    try:
+        discount = await page.text_content("span.pdp-discount") or ""
+        discount = discount.strip()
+        if discount:
+            result["discount_text"] = discount
+            result["discount_value"] = _clean_number(discount)
+    except Exception:
+        pass
 
-    # Discount
-    discount = await page.text_content("span.pdp-discount") or ""
-    discount = discount.strip()
-    if discount:
-        result["discount_text"] = discount
-        result["discount_value"] = _clean_number(discount)
-
-    # Selling Price from verbiage block as fallback
+    # --- Selling Price from verbiage block ---
     try:
         verbiage = await page.text_content("div.pdp-mrp-verbiage") or ""
         if verbiage:
@@ -263,60 +380,72 @@ async def extract_price_details(page) -> dict:
     except Exception:
         pass
 
-    # final fallback: selling_price = display_price
+    # --- Final fallback for selling price ---
     if result["selling_price_value"] is None and result["display_price_value"] is not None:
         result["selling_price_value"] = result["display_price_value"]
         if not result["selling_price_text"]:
             result["selling_price_text"] = result["display_price"]
 
-    # Features from the first product description ul li
-    features = []
-    li_texts = await page.locator("div.pdp-productDescriptorsContainer ul li").all_text_contents()
-    for li in li_texts:
-        text = li.strip()
-        if not text:
-            continue
-        # split on first ":" to attempt key:value
-        if ":" in text:
-            k, v = text.split(":", 1)
-            features.append({"key": k.strip(), "value": v.strip()})
-        else:
-            # fallback to generic feature key
-            features.append({"key": "feature", "value": text})
-    if features:
-        result["features"] = features
+    # --- Features ---
+    try:
+        features = []
+        li_texts = await page.locator("div.pdp-productDescriptorsContainer ul li").all_text_contents()
+        for li in li_texts:
+            text = li.strip()
+            if not text:
+                continue
+            if ":" in text:
+                k, v = text.split(":", 1)
+                features.append({"key": k.strip(), "value": v.strip()})
+            else:
+                features.append({"key": "feature", "value": text})
+        if features:
+            result["features"] = features
+    except Exception:
+        pass
 
-    # Size & Fit
-    size_and_fit = (await page.text_content("div.pdp-sizeFitDesc h4:has-text('Size & Fit') + p")) or ""
-    size_and_fit = size_and_fit.strip()
-    if size_and_fit:
-        result["size_and_fit"] = size_and_fit
+    # --- Size & Fit ---
+    try:
+        size_and_fit = await page.text_content("div.pdp-sizeFitDesc h4:has-text('Size & Fit') + p") or ""
+        size_and_fit = size_and_fit.strip()
+        if size_and_fit:
+            result["size_and_fit"] = size_and_fit
+    except Exception:
+        pass
 
-    # Material & Care
-    material_and_care = (await page.text_content("div.pdp-sizeFitDesc h4:has-text('Material & Care') + p")) or ""
-    material_and_care = material_and_care.strip()
-    # Replace <br> produced newlines maybe — ensure normalized
-    material_and_care = " ".join(material_and_care.split())
-    if material_and_care:
-        result["material_and_care"] = material_and_care
+    # --- Material & Care ---
+    try:
+        material_and_care = await page.text_content("div.pdp-sizeFitDesc h4:has-text('Material & Care') + p") or ""
+        material_and_care = material_and_care.strip()
+        material_and_care = " ".join(material_and_care.split())  # normalize spaces/newlines
+        if material_and_care:
+            result["material_and_care"] = material_and_care
+    except Exception:
+        pass
 
-    # Specifications: pairs of .index-rowKey and .index-rowValue
-    specs = []
-    rows = await page.locator("div.index-tableContainer > div.index-row").all()
-    # if direct children pattern doesn't match, try any .index-row under .index-tableContainer
-    if not rows:
-        rows = await page.locator(".index-tableContainer .index-row").all()
-    for r in rows:
-        key = (await r.locator(".index-rowKey").text_content()) or ""
-        val = (await r.locator(".index-rowValue").text_content()) or ""
-        key = key.strip()
-        val = val.strip()
-        if key or val:
-            specs.append({"key": key, "value": val})
-    if specs:
-        result["specifications"] = specs        
+    # --- Specifications ---
+    try:
+        specs = []
+        rows = await page.locator("div.index-tableContainer > div.index-row").all()
+        if not rows:
+            rows = await page.locator(".index-tableContainer .index-row").all()
+        for r in rows:
+            try:
+                key = (await r.locator(".index-rowKey").text_content()) or ""
+                val = (await r.locator(".index-rowValue").text_content()) or ""
+                key = key.strip()
+                val = val.strip()
+                if key or val:
+                    specs.append({"key": key, "value": val})
+            except Exception:
+                continue
+        if specs:
+            result["specifications"] = specs
+    except Exception:
+        pass
 
     return result
+
 
 
 # 👇 Accept playwright, not browser
@@ -331,11 +460,11 @@ async def scrape_product_details(context, link, semaphore):
         try:
             print(f" Scraping product details for {link['Product_Link']}...")
             # await page.goto(link['Product_Link'])
-            await page.goto(link['Product_Link'], wait_until="domcontentloaded", timeout=60000)
-            await asyncio.sleep(random.uniform(2, 4))
+            await page.goto(link['Product_Link'], wait_until="domcontentloaded", timeout=2000)
+            await asyncio.sleep(random.uniform(1, 2))
 
             try:
-                await page.wait_for_selector("h1.pdp-title", timeout=15000)  # wait for title
+                await page.wait_for_selector("h1.pdp-title", timeout=1500)  # wait for title
                 link['title'] = (await page.text_content("h1.pdp-title")) or ""
                 # sometimes description uses a different selector; fallback used here
                 link['description'] = (await page.text_content("h1.pdp-name")) or ""
@@ -377,7 +506,7 @@ async def scrape_product_details(context, link, semaphore):
                 review_link = 'https://www.myntra.com' + href if href else ""
                 link['reviews_link'] = review_link
                 reviews_details = await extract_reviews_details(review_link)
-                await asyncio.sleep(random.uniform(5, 8))
+                await asyncio.sleep(random.uniform(1, 2))
                 link['reviews'] = reviews_details.get("reviews", [])
                 link['sentiment'] = reviews_details.get("sentiment", None)
 
@@ -405,7 +534,8 @@ async def run_myntra_scraper():
     print("1111111111111111111")
     category_urls = [
         # Add more categories here
-        "https://www.myntra.com/men-kurtas",
+        "https://www.myntra.com/girl-kurta-sets?sort=popularity",
+        # "https://www.myntra.com/men-kurtas",
         # "https://www.myntra.com/girl-dresses",
         # "https://www.myntra.com/girl-lehenga-choli",
         # "https://www.myntra.com/girl-kurta-sets",
@@ -450,7 +580,7 @@ async def run_myntra_scraper():
                     #     "Referer": "https://www.google.com/"
                     # })
 
-                    await asyncio.sleep(random.uniform(3, 6))
+                    await asyncio.sleep(random.uniform(2, 4))
 
                     # 🔍 Scrape this page
                     links = await scrape_category(page, paginated_url)
@@ -464,7 +594,7 @@ async def run_myntra_scraper():
                 except Exception as e:
                     print(f"Error scraping {paginated_url}: {e}")
             # Now get all the required details by visiting each link
-            all_results = all_results[:2]
+            # all_results = all_results[:2]
             # Run up to 5 scrapers at a time in parallel
             # Limit parallelism (e.g., max 5 concurrent scrapers)
             semaphore = asyncio.Semaphore(2)
@@ -487,7 +617,7 @@ async def run_myntra_scraper():
                 await asyncio.gather(*tasks)
                 print(f" Completed one batch of {len(batch)} tasks.")
                 await context.close()
-                await asyncio.sleep(random.uniform(5, 8))  # delay before next batch
+                await asyncio.sleep(random.uniform(2, 5))  # delay before next batch
             
 
             # 💾 Save the collected product links to Excel
@@ -521,15 +651,19 @@ async def run_myntra_scraper():
 
             # Define file name
             filename = f"{category}_{timestamp}.xlsx"
+            filename_csv = f"{category}_{timestamp}.csv"
             file_path = os.path.join(folder_path, filename)
+            file_path_csv = os.path.join(folder_path,filename_csv)
 
             # Save the DataFrame
             df.to_excel(file_path, index=False)
-            print(df.head())
-            print(len(df))
-            print(f"✅ DataFrame saved successfully!")
-            print(f"Absolute path: {file_path}")
-            print(f"Number of rows saved: {len(df)}")
+            df.to_csv(file_path_csv, index=False)
+
+            # print(df.head())
+            # print(len(df))
+            # print(f"✅ DataFrame saved successfully!")
+            # print(f"Absolute path: {file_path}")
+            # print(f"Number of rows saved: {len(df)}")
 
             print(f"Saved to: {file_path}")
         await context.close()

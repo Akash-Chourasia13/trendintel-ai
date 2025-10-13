@@ -27,7 +27,7 @@ class ReviewAnalyzer:
     
     def get_overall_sentiment(self,text):
         result = self.sentiment_analyzer(text[:512])[0]
-        return {'label':result['label'].lower(),"score":round(result['score'],3)}
+        return {'label':result['label'].lower(),"score":round(result['score'],3)*100}
 
     def get_summary(self, text):
         if len(text.split()) < 30:
@@ -62,7 +62,7 @@ class ReviewAnalyzer:
                     aspect_sentiments[aspect] = []
                 aspect_sentiments[aspect].append({
                     'label':result['label'].lower(),
-                    'confidence': round(result['score'],3),
+                    'confidence': round(result['score'],3)*100,
                     'context':snippet
                 })       
         return aspect_sentiments   
