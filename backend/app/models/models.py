@@ -1,7 +1,7 @@
-from sqlalchemy import Column,Integer,String,Float,ForeignKey,Text,JSON,DateTime 
+from sqlalchemy import Column,Integer,String,Float,ForeignKey,Text,JSON,DateTime,Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from app.database import Base 
+from app.db.database import Base 
 
 # User table (for login / dashboard access)
 class User(Base):
@@ -25,7 +25,7 @@ class Platform(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), unique=True, nullable=False)
-    url = Column(string(255), nullable=True)
+    url = Column(String(255), nullable=True)
 
     categories = relationship("Category", back_populates="platform")
 
@@ -141,4 +141,4 @@ class ProductImage(Base):
 
     product_id = Column(Integer, ForeignKey("products.id"))
     product = relationship("Product", back_populates="images")
-    
+
