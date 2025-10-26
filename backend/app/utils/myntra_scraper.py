@@ -15,7 +15,7 @@ import pandas as pd
 from asyncio import Semaphore                           # For saving scraped data to Excel
 from more_itertools import chunked  # pip install more-itertools
 
-from review_analyzer import ReviewAnalyzer
+# from review_analyzer import ReviewAnalyzer
 
 # 🌐 Proxy list - rotating proxies to reduce chance of IP bans
 proxies = [
@@ -141,7 +141,7 @@ async def extract_reviews_details(review_link: str) -> dict:
         await asyncio.sleep(random.uniform(1, 2))
 
         reviews = []
-        review_analyzer = ReviewAnalyzer()
+        # review_analyzer = ReviewAnalyzer()
 
         # review_elements = await page.query_selector_all("div.user-review-userReviewWrapper")
         # 🔃 Scroll down to trigger lazy loading
@@ -551,7 +551,7 @@ async def run_myntra_scraper():
                 except Exception as e:
                     print(f"Error scraping {paginated_url}: {e}")
             # Now get all the required details by visiting each link
-            # all_results = all_results[:2]
+            all_results = all_results[:2]
             # Run up to 5 scrapers at a time in parallel
             # Limit parallelism (e.g., max 5 concurrent scrapers)
             semaphore = asyncio.Semaphore(2)
@@ -591,30 +591,31 @@ async def run_myntra_scraper():
 
             df["Number Of Ratings"] = df["numberOfRatings"].apply(extract_number)
             df = df.sort_values(by=["Number Of Ratings","Ratings"], ascending=[False, False])
+            return df
             # Save the sorted DataFrame back to Excel
             # df.to_excel("myntra_girl-dresses_links.xlsx", index=False)
             # return {"site": "myntra", "status": "success", "message": "Myntra scraper completed"}
         
             # Extract category name from URL
-            category = urlparse(category_url).path.strip("/")
+            # category = urlparse(category_url).path.strip("/")
 
             # Get timestamp
-            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
             # Create folder path
             # folder_path = os.path.join("scraped_data", category)
-            folder_path = os.path.abspath(os.path.join("scraped_data", category))
-            os.makedirs(folder_path, exist_ok=True)
+            # folder_path = os.path.abspath(os.path.join("scraped_data", category))
+            # os.makedirs(folder_path, exist_ok=True)
 
             # Define file name
-            filename = f"{category}_{timestamp}.xlsx"
-            filename_csv = f"{category}_{timestamp}.csv"
-            file_path = os.path.join(folder_path, filename)
-            file_path_csv = os.path.join(folder_path,filename_csv)
+            # filename = f"{category}_{timestamp}.xlsx"
+            # filename_csv = f"{category}_{timestamp}.csv"
+            # file_path = os.path.join(folder_path, filename)
+            # file_path_csv = os.path.join(folder_path,filename_csv)
 
             # Save the DataFrame
-            df.to_excel(file_path, index=False)
-            df.to_csv(file_path_csv, index=False)
+            # df.to_excel(file_path, index=False)
+            # df.to_csv(file_path_csv, index=False)
 
             # print(df.head())
             # print(len(df))
@@ -622,7 +623,7 @@ async def run_myntra_scraper():
             # print(f"Absolute path: {file_path}")
             # print(f"Number of rows saved: {len(df)}")
 
-            print(f"Saved to: {file_path}")
+            # print(f"Saved to: {file_path}")
         await context.close()
         await browser.close()    
 
@@ -655,4 +656,5 @@ if __name__ == "__main__":
 #         with open("myntra_log.txt", "a", encoding="utf-8") as f:
 #             f.write(f"❌ Error: {str(e)}\n")
 
-    asyncio.run(run_myntra_scraper())  # 🔁 Run the async main function inside event loop
+    df = asyncio.run(run_myntra_scraper())  # 🔁 Run the async main function inside event loop
+    print(df.head())

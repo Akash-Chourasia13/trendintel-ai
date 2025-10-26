@@ -1,6 +1,8 @@
 from fastapi import FastAPI
-from app.api import routes,scraper_routes
+from app.api import routes,scraper_routes,ingest
 from playwright.async_api import async_playwright  # Async Playwright for browser automation
+
+from fastapi.middleware.cors import CORSMiddleware
 
 # main.py
 
@@ -22,6 +24,14 @@ app = FastAPI(title = "TrendIntel AI")
 #         await browser.close()
 #     return {"message": "Playwright works!"}
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(routes.router)
 app.include_router(scraper_routes.router)
+app.include_router(ingest.router)
